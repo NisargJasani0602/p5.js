@@ -733,6 +733,35 @@ if (typeof IS_MINIFIED !== 'undefined') {
     for (let i = 0; i < overloads.length; i++) {
       const score = scoreOverload(args, argCount, overloads[i], minScore);
       if (score === 0) {
+        // Provide a friendly hint if a Function was passed where a
+        // Function wasn't among the expected types.
+        try {
+          const formats = overloads[i].formats;
+          for (let p = 0; p < Math.min(argCount, formats.length); p++) {
+            const arg = args[p];
+            if (typeof arg === 'function') {
+              const f = formats[p];
+              if (!f || !Array.isArray(f.types)) break;
+              const expectsFunction = formats[p].types.some(t =>
+                ((t.builtin || t.name || '') + '')
+                  .toLowerCase()
+                  .startsWith('function')
+              );
+              if (!expectsFunction) {
+                const fnName = arg.name || 'anonymous';
+                const specific =
+                  fnName === 'value'
+                    ? ' Did you mean element.value()?'
+                    : ` Did you mean ${fnName}()?`;
+                const msg = `${func}(): received a Function (${fnName}) where a non-Function was expected.${specific}`;
+                p5._friendlyError(msg, func, 3);
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // fail silently if anything unexpected happens
+        }
         return; // done!
       } else if (minScore > score) {
         // this score is better that what we have so far...
